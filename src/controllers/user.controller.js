@@ -45,40 +45,54 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Request body is missing");
   }
 
-  const { fullName, email, userName, password } = req.body;
+  const { fullName, email, username, password } = req.body;
 
   if (
-    [fullName, email, userName, password].some((field) => field?.trim() === "")
+    [fullName, email, username, password].some((field) => field?.trim() === "")
   ) {
     throw new ApiError(400, "All fields are required");
   }
 
   const existedUser = await User.findOne({
-    $or: [{ email }, { userName }],
+    $or: [{ email }, { username }],
   });
 
   if (existedUser) {
-    throw new ApiError(404, "User with email or userName already exists");
+    throw new ApiError(404, "User with email or username already exists");
   }
 
-  const avatarLocalPath = req.files?.avatar[0]?.path
+  console.log("req.files:", req.files);
+
+  const avatarLocalPath = req.files?.avatar?.[0]?.path
     ? path.resolve(req.files.avatar[0].path)
     : undefined;
-  const coverImageLocalPath = req.files?.coverImage[0]?.path
+  const coverImageLocalPath = req.files?.coverImage?.[0]?.path
     ? path.resolve(req.files.coverImage[0].path)
     : undefined;
+
+  console.log("req.files:", req.files);
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar image is required");
   }
 
+  if (!coverImageLocalPath) {
+    throw new ApiError(400, "Cover image is required");
+  }
+
   const avatar = await uploadOnCloudinary(avatarLocalPath);
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+  if (
+    [fullName, email, username, password].some((field) => field?.trim() === "")
+  ) {
+    throw new ApiError(400, "All fields are required");
+  }
 
   const user = await User.create({
     fullName,
     email,
-    userName: userName.toLowerCase(),
+    userName: username.toLowerCase(),
     avatar: avatar?.url,
     coverImage: coverImage?.url || "",
     password,
