@@ -13,7 +13,7 @@ import {
   getUserWatchHistory,
   updateUserCoverImage,
 } from "../controllers/user.controller.js";
-import { verifyJWT } from "../middlewares/Auth.middleware.js";
+import { verifyJWT } from "../middlewares/auth.middleware.js";
 
 
 

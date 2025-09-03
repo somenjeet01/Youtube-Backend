@@ -109,7 +109,6 @@ const publishAVideo = asyncHandler(async (req, res) => {
   console.log("BODY:", req.body);
   console.log("FILES:", req.files);
 
-
   const { title, description } = req.body;
 
   if (!title || !description) {
@@ -134,7 +133,6 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
   console.log("Cloudinary thumbnail response:", thumbnail.url);
   console.log("Cloudinary video file response:", videoFile.url);
-
 
   if (!thumbnail?.url) {
     throw new ApiError(500, "Thumbnail upload failed, please try again later");
@@ -176,7 +174,7 @@ const publishAVideo = asyncHandler(async (req, res) => {
     isPublished: true, // from verifyJWT middleware
   });
 
-  // await newVideo.save();
+   await newVideo.save();
 
   if (!newVideo) {
     throw new ApiError(500, "Something went wrong while publishing the video");
@@ -303,16 +301,167 @@ const getVideoById = asyncHandler(async (req, res) => {
 });
 
 const updateVideo = asyncHandler(async (req, res) => {
-  // ... existing code
+  const { videoId } = req.params;
+  //TODO: update video details like title, description, thumbnail
+
+  // Step 1: Validate the videoId
+  // - Check if the videoId is a valid MongoDB ObjectId.
+  // - If not, throw an ApiError with a 400 status code and an appropriate message.
+
+  // Step 2: Extract new video details from the request
+  // - Get the new title, description from req.body.
+  // - Get the new thumbnail file path from req.file (uploaded via multer middleware).
+
+  // Step 3: Validate the presence of required fields
+  // - Ensure that at least one of the fields (title, description, thumbnail) is provided.
+  // - If none are provided, throw an ApiError with a 400 status code.
+
+  // Step 4: Upload new thumbnail to Cloudinary (if provided)
+  // - If a new thumbnail is provided, upload it to Cloudinary using the uploadOnCloudinary utility.
+  // - Check if the upload was successful, if not, throw an ApiError with a 500 status code.
+
+  // Step 5: Prepare the update object
+  // - Create an update object with the new title, description, and thumbnail URL (if updated).
+  // - Only include fields in the update object that are provided in the request.
+
+  // Step 6: Update the video document in the database
+  // - Use the Video model to find the video by videoId and update it with the prepared update object.
+  // - If the video is not found, throw an ApiError with a 404 status code.
+
+  // Step 7: Return a success response
+  // - If the update is successful, return a 200 status code with the updated video data in the response.
+
+  if (!isValidObjectId(videoId)) {
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  const { title, description, thumbnailNew } = req.body;
+
+  if (!title && !description && !thumbnailNew) {
+    throw new ApiError(400, "title, description or thumbnail must be provided");
+  }
+
+  const thumbnailLocalPath = req.file?.path;
+
+  if (!thumbnailLocalPath) {
+    throw new ApiError(400, "Thumbnail local path does not found");
+  }
+
+  const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
+  if (!thumbnail?.url) {
+    throw new ApiError(500, "Failed to upload thumbnail");
+  }
+
+
+  const authorizedUser = await Video.findById(videoId);
+  if (!authorizedUser) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (String(authorizedUser.owner) !== String(req.user._id)) {
+    throw new ApiError(403, "Not authorized to 'update' this video");
+  }
+
+  const updateVideoDetails = await Video.findByIdAndUpdate(
+    videoId,
+    {
+      title,
+      description,
+      thumbnail: thumbnail.url,
+    },
+    { new: true }
+  );
+
+  if (!updateVideoDetails) {
+    throw new ApiError(404, "video not found by the ID");
+  }
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updateVideoDetails, "Video updated successfully")
+    );
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
   //TODO: delete video
+    // Step 1: Extract videoId from request parameters
+  // - Get the videoId from req.params.
+
+  // Step 2: Validate the videoId
+  // - Check if videoId is a valid MongoDB ObjectId.
+  // - If not, throw an ApiError with a 400 status code and a message like "Invalid video ID".
+
+  // Step 3: Find the video by videoId
+  // - Use the Video model to find the video document by its ID.
+  // - If the video does not exist, throw an ApiError with a 404 status code and a message like "Video not found".
+
+  // Step 4: (Optional) Check if the requesting user is the owner of the video
+  // - Compare req.user._id with video.owner.
+  // - If not the owner, throw an ApiError with a 403 status code ("Not authorized to delete this video").
+
+  // Step 5: Delete the video document
+  // - Use the Video model to delete the video by its ID.
+
+  // Step 6: (Optional) Remove the video from users' watchHistory or related collections if needed.
+
+  // Step 7: Return a success response
+  // - Return a 200 status code with a message like "Video deleted successfully".
+
+  if (!isValidObjectId(videoId)){
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  const deletedVideo = await Video.findById(videoId);
+  if (!deletedVideo) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if (String(deletedVideo.owner) !== String(req.user._id)) {
+    throw new ApiError(403, "Not authorized to delete this video");
+  }
+
+  await Video.findByIdAndDelete(videoId);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Video deleted successfully"));
+
 });
+
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
   const { videoId } = req.params;
+  //get the video by the id
+  //authorized the video is valid or not 
+  //check the user of the video is only to make video published
+  //if yes allow otherwise throught api error 404
+  //const update the model with toggle button pressed update the mongoose model with key isPublished set to true.
+  if(!isValidObjectId(videoId)){
+    throw new ApiError(400, "Invalid video ID");
+  }
+
+  const authorizedUser = await Video.findById(videoId);
+  if (!authorizedUser) {
+    throw new ApiError(404, "Video not found");
+  }
+
+  if(String(req.user._id) !== String(authorizedUser.owner)) {
+    throw new ApiError(403, "Not authorized to publish this video");
+  }
+
+  if(authorizedUser.isPublished) {
+    throw new ApiError(400, "Video is already published");
+  }
+
+   authorizedUser.isPublished = true;
+   await authorizedUser.save();
+
+   return res
+     .status(200)
+     .json(new ApiResponse(200, authorizedUser, "Video published successfully"));
+
 });
 
 export {
