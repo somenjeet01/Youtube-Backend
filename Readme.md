@@ -22,6 +22,8 @@ This project is the backend of a video-sharing platform similar to YouTube. It i
 - **Multer** (for file uploads)  
 - **bcrypt** (for password hashing)  
 - **dotenv** (for environment variables)
+- Model Link:- https://app.eraser.io/#note-title-editor
+
 
 ## Installation
 
